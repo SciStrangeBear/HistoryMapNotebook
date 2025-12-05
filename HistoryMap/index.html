@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>历史地理工具 - HistoryMap</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossorigin=""/>
+    
+    <!-- 自定义样式 -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- 工具栏 -->
+    <div id="toolbar">
+        <!-- 标题区域 -->
+        <div class="toolbar-section title-section">
+            <h1>历史地理笔记工具</h1>
+        </div>
+        
+        <!-- 工具区域 -->
+        <div class="toolbar-section tools-section">
+            <div class="tool-group">
+                <span class="section-label">工具:</span>
+                <button id="pinToolBtn" class="tool-btn">图钉</button>
+                <button id="selectToolBtn" class="tool-btn active">选择</button>
+                <button id="importBtn" class="tool-btn">📁 导入</button>
+            </div>
+            
+            <!-- 隐藏的文件输入 -->
+            <input type="file" id="fileInput" accept=".md" multiple style="display: none;">
+
+        </div>
+        
+        <!-- 过滤区域 -->
+        <div class="toolbar-section filters-section">
+            <span class="section-label">过滤:</span>
+            <div class="filter-controls">
+                <div class="control-item">
+                    <label for="tagFilter">标签:</label>
+                    <select id="tagFilter" class="styled-select">
+                        <option value="">显示全部</option>
+                    </select>
+                </div>
+                <div class="control-item year-range">
+                    <label>时间区间:</label>
+                    <div class="year-inputs">
+                        <input type="number" id="startYear" class="styled-input year-input" placeholder="起始年份" min="-3000" max="2100">
+                        <span class="year-separator">-</span>
+                        <input type="number" id="endYear" class="styled-input year-input" placeholder="结束年份" min="-3000" max="2100">
+                    </div>
+                </div>
+                <div class="control-buttons">
+                    <button id="filterBtn" class="action-btn primary">过滤</button>
+                    <button id="clearFilterBtn" class="action-btn secondary">清除</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 视图区域 -->
+        <div class="toolbar-section view-section">
+            <span class="section-label">视图:</span>
+            <div class="layer-group">
+                <button id="layerBtn" class="layer-btn action-btn">🗺️ 图层</button>
+                <div id="layerDropdown" class="layer-dropdown">
+                    <div class="layer-option" data-layer="basic">🏙️ 高德地图（基本）</div>
+                    <div class="layer-option" data-layer="satellite">🛰️ 高德地图（卫星）</div>
+                    <div class="layer-option" data-layer="openstreet">🗺️ OpenStreet</div>
+                    <div class="layer-option" data-layer="google">🌍 GoogleMap</div>
+                </div>
+            </div>
+            <button id="helpBtn" class="action-btn secondary">❓ 帮助</button>
+        </div>
+    </div>
+
+    <!-- 地图容器 -->
+    <div id="map"></div>
+
+    <!-- 图钉信息弹窗 -->
+    <div id="pinModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>添加历史标记</h2>
+            <form id="pinForm">
+                <div class="form-group">
+                    <label for="year">年份 (必填):</label>
+                    <input type="number" id="year" required min="-3000" max="2100" placeholder="例如: 1949">
+                </div>
+                <div class="form-group">
+                    <label for="category">标签 (可多选):</label>
+                    <div class="tag-selector">
+                        <div id="availableTags" class="available-tags">
+                            <!-- 可选标签将在这里动态加载 -->
+                        </div>
+                        <div id="selectedTags" class="selected-tags">
+                            <div class="selected-tags-label">已选标签:</div>
+                            <div id="selectedTagsList" class="selected-tags-list">
+                                <!-- 已选标签将在这里显示 -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="notes">笔记:</label>
+                    <textarea id="notes" rows="5" placeholder="记录详细信息..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>图钉样式:</label>
+                    <div class="pin-style-controls">
+                        <div class="control-item">
+                            <label for="modalPinColor">颜色:</label>
+                            <select id="modalPinColor" class="styled-select">
+                                <option value="auto">自动(按年份)</option>
+                                <option value="red">红色</option>
+                                <option value="green">绿色</option>
+                                <option value="blue">蓝色</option>
+                                <option value="yellow">黄色</option>
+                                <option value="purple">紫色</option>
+                                <option value="orange">橙色</option>
+                            </select>
+                        </div>
+                        <div class="control-item">
+                            <label for="modalPinStyle">样式:</label>
+                            <select id="modalPinStyle" class="styled-select">
+                                <option value="circle">圆形</option>
+                                <option value="square">方形</option>
+                                <option value="triangle">三角形</option>
+                                <option value="diamond">菱形</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-buttons">
+                    <button type="submit">确认</button>
+                    <button type="button" id="saveAsMarkdownBtn">保存</button>
+                    <button type="button" id="cancelBtn">取消</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 图钉详情弹窗 -->
+    <div id="detailModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>历史标记详情</h2>
+            <div id="detailContent">
+                <!-- 详情内容将在这里动态加载 -->
+            </div>
+            <div class="form-buttons">
+                <button id="editBtn">编辑</button>
+                <button id="deleteBtn">删除</button>
+                <button id="closeDetailBtn">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
+    
+    <!-- 主要JavaScript -->
+    <script src="app.js"></script>
+</body>
+</html>
