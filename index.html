@@ -16,13 +16,12 @@
 <body>
     <!-- 工具栏 -->
     <div id="toolbar">
-        <!-- 标题区域 -->
-        <div class="toolbar-section title-section">
-            <h1>历史地理笔记工具</h1>
-        </div>
-        
         <!-- 工具区域 -->
         <div class="toolbar-section tools-section">
+            <!-- 将标题模块移至工具选项卡正上方 -->
+            <div class="title-section" aria-label="历史地理笔记标题">
+                <h1>历史地理笔记</h1>
+            </div>
             <div class="tool-group">
                 <span class="section-label">工具:</span>
                 <button id="pinToolBtn" class="tool-btn">图钉</button>
@@ -46,12 +45,28 @@
                     </select>
                 </div>
                 <div class="control-item year-range">
-                    <label>时间区间:</label>
-                    <div class="year-inputs">
-                        <input type="number" id="startYear" class="styled-input year-input" placeholder="起始年份" min="-3000" max="2100">
-                        <span class="year-separator">-</span>
-                        <input type="number" id="endYear" class="styled-input year-input" placeholder="结束年份" min="-3000" max="2100">
+                    <label>日期区间:</label>
+                    <div class="date-range-inputs">
+                        <div class="date-group">
+                            <span class="date-group-label">起始</span>
+                            <label for="startYear">年</label>
+                            <input type="text" id="startYear" class="styled-input small-input" placeholder="YYYY" pattern="^-?\d{1,4}$" title="年份格式：YYYY，可选负号表示公元前">
+                            <label for="startMonth">月</label>
+                            <input type="number" id="startMonth" class="styled-input small-input" placeholder="MM" min="1" max="12" inputmode="numeric" title="月份范围：01-12">
+                            <label for="startDay">日</label>
+                            <input type="number" id="startDay" class="styled-input small-input" placeholder="DD" min="1" max="31" inputmode="numeric" title="日期范围：01-31">
+                        </div>
+                        <div class="date-group">
+                            <span class="date-group-label">结束</span>
+                            <label for="endYear">年</label>
+                            <input type="text" id="endYear" class="styled-input small-input" placeholder="YYYY" pattern="^-?\d{1,4}$" title="年份格式：YYYY，可选负号表示公元前">
+                            <label for="endMonth">月</label>
+                            <input type="number" id="endMonth" class="styled-input small-input" placeholder="MM" min="1" max="12" inputmode="numeric" title="月份范围：01-12">
+                            <label for="endDay">日</label>
+                            <input type="number" id="endDay" class="styled-input small-input" placeholder="DD" min="1" max="31" inputmode="numeric" title="日期范围：01-31">
+                        </div>
                     </div>
+                    <div id="dateFilterMsg" class="input-msg" aria-live="polite"></div>
                 </div>
                 <div class="control-buttons">
                     <button id="filterBtn" class="action-btn primary">过滤</button>
@@ -70,14 +85,22 @@
                     <div class="layer-option" data-layer="satellite">🛰️ 高德地图（卫星）</div>
                     <div class="layer-option" data-layer="openstreet">🗺️ OpenStreet</div>
                     <div class="layer-option" data-layer="google">🌍 GoogleMap</div>
+                    <div class="layer-option" data-layer="google_satellite">🛰️ Google Map（卫星）</div>
                 </div>
             </div>
-            <button id="helpBtn" class="action-btn secondary">❓ 帮助</button>
+        </div>
+
+        <!-- 帮助区域（右侧） -->
+        <div class="toolbar-section help-section" style="margin-left: auto;">
+            <button id="helpBtn" class="tool-btn" title="帮助">❓ 帮助</button>
         </div>
     </div>
 
     <!-- 地图容器 -->
     <div id="map"></div>
+
+    <!-- 帮助弹窗组件 -->
+    <help-modal id="helpModal"></help-modal>
 
     <!-- 图钉信息弹窗 -->
     <div id="pinModal" class="modal">
@@ -86,8 +109,8 @@
             <h2>添加历史标记</h2>
             <form id="pinForm">
                 <div class="form-group">
-                    <label for="year">年份 (必填):</label>
-                    <input type="number" id="year" required min="-3000" max="2100" placeholder="例如: 1949">
+                    <label for="date">日期 (必填):</label>
+                    <input type="text" id="date" required placeholder="例如: 1949-10-01 或 -0300-01-01" pattern="^-?\d{1,4}-\d{2}-\d{2}$" title="格式为 YYYY-MM-DD，可选负号表示公元前">
                 </div>
                 <div class="form-group">
                     <label for="category">标签 (可多选):</label>
@@ -164,6 +187,8 @@
             crossorigin=""></script>
     
     <!-- 主要JavaScript -->
+    <!-- Markdown 解析库 -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

@@ -17,8 +17,9 @@ body {
     color: white;
     padding: 10px 20px;
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start; /* 整体左对齐 */
     align-items: center;
+    gap: 12px; /* 缩小各区段之间的间距 */
     box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     z-index: 1000;
     position: relative;
@@ -155,13 +156,13 @@ body {
     display: none;
     position: absolute;
     top: 100%;
-    left: 0;
+    left: 0; /* 桌面端与移动端统一从按钮左边对齐，防止越界 */
     background: white;
     border: 1px solid #ddd;
     border-radius: 4px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    z-index: 1001;
-    min-width: 150px;
+    z-index: 1100; /* 提升层级，避免遮挡 */
+    min-width: 180px; /* 适当增大，确保内容可见 */
     margin-top: 2px;
 }
 
@@ -212,10 +213,25 @@ body {
 }
 
 .title-section h1 {
-    font-size: 1.3em;
+    font-size: clamp(18px, 2.4vw, 22px);
     font-weight: bold;
     margin: 0;
     text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    white-space: normal;
+    word-break: break-word;
+    text-align: center;
+    line-height: 1.2;
+}
+
+/* 让工具区域形成纵向布局，并将标题放到其上方 */
+.tools-section {
+    flex-direction: column;
+    align-items: flex-start;
+}
+.tools-section .title-section {
+    border-bottom: none; /* 避免在工具区域内重复分割线 */
+    padding: 0;
+    margin-bottom: 10px; /* 与“工具”保持 8-12px 间距，选 10px */
 }
 
 /* 区域标签 */
@@ -313,6 +329,43 @@ body {
     color: rgba(255,255,255,0.5);
 }
 
+/* 日期区间（三段式）样式 */
+.date-range-inputs {
+    display: flex;
+    flex-direction: column; /* 两行显示：起始在上，结束在下 */
+    gap: 10px; /* 行间距 8-12px 之间，取 10px */
+    align-items: flex-start;
+}
+.date-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+}
+.date-group-label {
+    font-weight: 600;
+    color: #fff;
+    min-width: 40px; /* 起始/结束标签占位，保证两行左侧对齐 */
+    margin-right: 2px;
+}
+.date-group label {
+    min-width: 20px; /* 年/月/日标签统一占位，保证控件对齐 */
+    text-align: right;
+}
+.small-input {
+    width: 52px; /* 缩小约35%（原80px）*/
+    min-width: 52px;
+}
+.input-msg {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #ffe082;
+}
+.input-error {
+    border-color: #ff6b6b !important;
+    box-shadow: 0 0 0 2px rgba(255,107,107,0.2);
+}
+
 /* 按钮样式 */
 .action-btn {
     padding: 6px 12px;
@@ -352,6 +405,8 @@ body {
     transform: translateY(-1px);
 }
 
+/* 城市名称开关已移除 */
+
 /* 工具按钮样式 */
 .tool-btn {
     padding: 8px 16px;
@@ -380,7 +435,7 @@ body {
 .tool-group {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 6px; /* 压缩按钮间距，紧凑但不重叠 */
 }
 
 /* 地图样式 */
@@ -396,6 +451,25 @@ body {
 
 #map.select-mode {
     cursor: default;
+}
+
+/* 坐标悬浮提示框 */
+.coords-tooltip {
+    position: absolute;
+    z-index: 3000;
+    padding: 6px 8px;
+    border-radius: 4px;
+    background: rgba(0,0,0,0.75);
+    color: #fff;
+    font-size: 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    pointer-events: none; /* 不影响主流程操作 */
+    user-select: none;
+    white-space: nowrap;
+}
+
+.coords-tooltip.error {
+    background: rgba(200,0,0,0.85);
 }
 
 /* 弹窗样式 */
@@ -677,18 +751,18 @@ body {
 
 /* 圆形图钉 */
 .pin-circle {
-    width: 20px;
-    height: 20px;
-    border: 3px solid white;
+    width: 14px;
+    height: 14px;
+    border: 2px solid white;
     border-radius: 50%;
     box-shadow: 0 3px 10px rgba(0,0,0,0.3);
 }
 
 /* 方形图钉 */
 .pin-square {
-    width: 20px;
-    height: 20px;
-    border: 3px solid white;
+    width: 14px;
+    height: 14px;
+    border: 2px solid white;
     border-radius: 3px;
     box-shadow: 0 3px 10px rgba(0,0,0,0.3);
 }
@@ -697,9 +771,9 @@ body {
 .pin-triangle {
     width: 0;
     height: 0;
-    border-left: 12px solid transparent;
-    border-right: 12px solid transparent;
-    border-bottom: 20px solid;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-bottom: 14px solid;
     border-top: none;
     box-shadow: 0 3px 10px rgba(0,0,0,0.3);
     position: relative;
@@ -708,20 +782,20 @@ body {
 .pin-triangle::after {
     content: '';
     position: absolute;
-    top: 3px;
-    left: -9px;
+    top: 2px;
+    left: -6px;
     width: 0;
     height: 0;
-    border-left: 9px solid transparent;
-    border-right: 9px solid transparent;
-    border-bottom: 15px solid white;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-bottom: 11px solid white;
 }
 
 /* 菱形图钉 */
 .pin-diamond {
-    width: 16px;
-    height: 16px;
-    border: 3px solid white;
+    width: 12px;
+    height: 12px;
+    border: 2px solid white;
     transform: rotate(45deg);
     box-shadow: 0 3px 10px rgba(0,0,0,0.3);
 }
@@ -743,7 +817,7 @@ body {
     
     .toolbar-section {
         width: 100%;
-        justify-content: center;
+        justify-content: flex-start; /* 移动端也保持左对齐 */
     }
     
     .modal-content {
@@ -754,6 +828,27 @@ body {
     
     #map {
         height: calc(100vh - 120px);
+    }
+    /* 移动端优化标题字号与换行 */
+    .title-section h1 {
+        font-size: clamp(17px, 4.5vw, 20px);
+        max-width: 92vw;
+    }
+
+    /* 移动端确保下拉菜单不越界 */
+    .layer-dropdown {
+        left: 0; /* 移动端不偏移，避免越界 */
+        right: auto;
+        min-width: unset;
+        width: auto;
+        max-width: calc(100vw - 24px);
+    }
+}
+
+    /* 移动端适配更易读的宽度（略增至56px，便于触控） */
+    .small-input {
+        width: 56px;
+        min-width: 56px;
     }
 }
 
@@ -771,3 +866,26 @@ body {
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
+
+/* ---- 多笔记弹窗外观与动画 ---- */
+.leaflet-popup.note-popup .leaflet-popup-content-wrapper {
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    border-radius: 8px;
+    animation: notePopupIn 0.3s ease;
+}
+
+.leaflet-popup.note-popup .leaflet-popup-tip {
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+
+@keyframes notePopupIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* 覆盖Leaflet的淡入淡出速度为300ms，保证关闭动画接近要求 */
+.leaflet-fade-anim .leaflet-popup {
+    transition: opacity 0.3s ease;
+}
+
+/* 城市/国家名称标注样式已移除 */
