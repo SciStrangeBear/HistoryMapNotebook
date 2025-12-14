@@ -75,7 +75,7 @@ function initMap() {
     // 城市名称懒加载事件已移除
     
     // 监听弹窗打开/关闭以维护状态
-    map.on('popupopen', function(e) {
+map.on('popupopen', function(e) {
         const popup = e.popup;
         const source = popup._source; // 关联的marker
         if (!source) return;
@@ -94,6 +94,50 @@ function initMap() {
         const chosenOffset = offsets[idx % offsets.length];
         popup.options.offset = chosenOffset;
         popup.update();
+
+        // 绑定展开/收起按钮与懒加载正文
+        const root = popup._contentNode; // 弹窗内容根节点
+        if (root) {
+            const expandBtn = root.querySelector('.btn-expand');
+            const collapseBtn = root.querySelector('.btn-collapse');
+            const detailsEl = root.querySelector('.popup-details');
+            const markerId = source._leaflet_id;
+            const pin = pins[markerId];
+            if (expandBtn && collapseBtn && detailsEl && pin) {
+                const loadBodyHtml = () => {
+                    if (detailsEl.dataset.loaded === 'true') return;
+                    const md = pin.data.body || pin.data.notes || '';
+                    try {
+                        const html = window.marked ? window.marked.parse(md) : md.replace(/\n/g,'<br>');
+                        detailsEl.innerHTML = html;
+                        detailsEl.dataset.loaded = 'true';
+                    } catch (err) {
+                        detailsEl.innerHTML = `<div style="color:#c00">加载正文失败: ${err.message}</div>`;
+                        detailsEl.dataset.loaded = 'true';
+                    }
+                };
+                const expand = (ev) => {
+                    ev && ev.preventDefault();
+                    ev && ev.stopPropagation();
+                    loadBodyHtml();
+                    detailsEl.style.maxHeight = detailsEl.scrollHeight + 'px';
+                    expandBtn.style.display = 'none';
+                    collapseBtn.style.display = 'inline-block';
+                };
+                const collapse = (ev) => {
+                    ev && ev.preventDefault();
+                    ev && ev.stopPropagation();
+                    detailsEl.style.maxHeight = '0';
+                    collapseBtn.style.display = 'none';
+                    expandBtn.style.display = 'inline-block';
+                };
+                expandBtn.addEventListener('click', expand, { passive: false });
+                collapseBtn.addEventListener('click', collapse, { passive: false });
+                // 触控优化：使用 touchstart 响应更快，阻止误触传播
+                expandBtn.addEventListener('touchstart', expand, { passive: false });
+                collapseBtn.addEventListener('touchstart', collapse, { passive: false });
+            }
+        }
 
         // 限制最多5个，超出则关闭最早打开的一个
         if (openNotes.length > 5) {
@@ -138,6 +182,12 @@ function showPinModal() {
         if (selectedTagsList) {
             selectedTagsList.innerHTML = '';
         }
+        // 重置标题计数器
+        const titleCounter = document.getElementById('titleCounter');
+        const titleInput = document.getElementById('title');
+        if (titleCounter && titleInput) {
+            titleCounter.textContent = `${titleInput.value.length} / 50`;
+        }
     }
 }
 
@@ -154,6 +204,8 @@ function loadPins() {
         pinsData.forEach(pinData => {
             // 迁移旧数据：year -> date
             normalizePinDate(pinData);
+            // 迁移旧数据：notes -> title/body
+            normalizePinFields(pinData);
             createPinFromData(pinData);
         });
     }
@@ -163,7 +215,9 @@ function loadPins() {
 function createPinFromData(pinData) {
     // 标准化日期字段，兼容旧的 year
     normalizePinDate(pinData);
-    const { lat, lng, date, category, notes, color, style } = pinData;
+    // 标准化字段（兼容旧notes）
+    normalizePinFields(pinData);
+    const { lat, lng, date, category, title, body, color, style } = pinData;
     
     // 创建图钉标记
     const marker = L.marker([lat, lng], {
@@ -171,17 +225,7 @@ function createPinFromData(pinData) {
     }).addTo(map);
     
     // 绑定弹出窗口
-    const popupContent = `
-        <div class="popup-content">
-            <h3>${date}</h3>
-            <p><strong>类别:</strong> ${category}</p>
-            <p><strong>笔记:</strong> ${notes}</p>
-            <div class="popup-actions">
-                <button onclick="editPin('${marker._leaflet_id}')">编辑</button>
-                <button onclick="deletePin('${marker._leaflet_id}')">删除</button>
-            </div>
-        </div>
-    `;
+    const popupContent = buildPopupContent({ date, category, title }, marker._leaflet_id);
     
     marker.bindPopup(popupContent, { autoClose: false, closeOnClick: false, className: 'note-popup' });
     
@@ -283,7 +327,13 @@ function editPin(markerId) {
     const data = pin.data;
     document.getElementById('date').value = data.date || '';
     setSelectedTags(data.category); // 设置选中的标签
-    document.getElementById('notes').value = data.notes;
+    // 兼容旧字段
+    const titleInput = document.getElementById('title');
+    const bodyInput = document.getElementById('body');
+    if (titleInput) titleInput.value = data.title || deriveTitle(data.notes || '');
+    if (bodyInput) bodyInput.value = data.body || data.notes || '';
+    const titleCounter = document.getElementById('titleCounter');
+    if (titleCounter && titleInput) titleCounter.textContent = `${titleInput.value.length} / 50`;
     document.getElementById('modalPinColor').value = data.color || 'auto';
     document.getElementById('modalPinStyle').value = data.style || 'circle';
     
@@ -320,9 +370,13 @@ function savePinAsMarkdown(pinData) {
 
 **样式:** ${pinData.style}
 
-## 笔记
+## 标题
 
-${pinData.notes || '无'}`;
+${(pinData.title || deriveTitle(pinData.body || pinData.notes || '')).slice(0,50) || '未命名'}
+
+## 正文
+
+${pinData.body || pinData.notes || '无'}`;
     
     // 创建下载链接
     const blob = new Blob([content], { type: 'text/markdown' });
@@ -340,13 +394,14 @@ ${pinData.notes || '无'}`;
 }
 
 // 添加新图钉
-function addPin(lat, lng, date, category, notes, color, style) {
+function addPin(lat, lng, date, category, title, body, color, style) {
     const pinData = {
         lat: lat,
         lng: lng,
         date: date,
         category: category,
-        notes: notes,
+        title: (title || '').slice(0,50) || deriveTitle(body || ''),
+        body: body || '',
         color: color,
         style: style
     };
@@ -364,7 +419,8 @@ document.addEventListener('DOMContentLoaded', function() {
     initMap();
     
     // 绑定表单提交事件
-    document.getElementById('pinForm').addEventListener('submit', function(e) {
+    const pinFormEl = document.getElementById('pinForm');
+    pinFormEl.addEventListener('submit', function(e) {
         e.preventDefault();
         
         const date = document.getElementById('date').value.trim();
@@ -373,7 +429,14 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         const category = getSelectedTags(); // 获取选中的标签
-        const notes = document.getElementById('notes').value;
+        const title = (document.getElementById('title').value || '').trim();
+        const body = (document.getElementById('body').value || '').trim();
+        // 标题必填且≤50字
+        if (!title) {
+            alert('请填写标题（必填，≤50字）');
+            return;
+        }
+        const finalTitle = title.slice(0,50);
         const color = document.getElementById('modalPinColor').value;
         const style = document.getElementById('modalPinStyle').value;
         
@@ -384,7 +447,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 // 更新数据
                 pin.data.date = date;
                 pin.data.category = category;
-                pin.data.notes = notes;
+                pin.data.title = finalTitle;
+                pin.data.body = body;
                 pin.data.color = color;
                 pin.data.style = style;
                 
@@ -392,17 +456,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 pin.marker.setIcon(createCustomIcon(color, style));
                 
                 // 更新弹出窗口
-                const popupContent = `
-                    <div class="popup-content">
-                        <h3>${date}</h3>
-                        <p><strong>类别:</strong> ${category}</p>
-                        <p><strong>笔记:</strong> ${notes}</p>
-                        <div class="popup-actions">
-                            <button onclick="editPin('${currentEditingPin}')">编辑</button>
-                            <button onclick="deletePin('${currentEditingPin}')">删除</button>
-                        </div>
-                    </div>
-                `;
+                const popupContent = buildPopupContent({ date, category, title: finalTitle }, currentEditingPin);
                 pin.marker.setPopupContent(popupContent);
                 
                 savePins();
@@ -413,13 +467,22 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             // 添加模式
             if (currentLatLng) {
-                addPin(currentLatLng.lat, currentLatLng.lng, date, category, notes, color, style);
+                addPin(currentLatLng.lat, currentLatLng.lng, date, category, finalTitle, body, color, style);
                 currentLatLng = null;
             }
         }
         
         hideModal('pinModal');
     });
+
+    // 标题输入计数器
+    const titleInput = document.getElementById('title');
+    const titleCounter = document.getElementById('titleCounter');
+    if (titleInput && titleCounter) {
+        titleInput.addEventListener('input', function() {
+            titleCounter.textContent = `${this.value.length} / 50`;
+        }, { passive: true });
+    }
 
     // 城市名称开关已移除
     
@@ -431,7 +494,7 @@ document.addEventListener('DOMContentLoaded', function() {
         currentLatLng = null;
      });
      
-     // 绑定保存按钮
+     // 绑定“保存为MD”按钮
      document.getElementById('saveAsMarkdownBtn').addEventListener('click', function() {
          
          // 收集表单数据
@@ -440,7 +503,13 @@ document.addEventListener('DOMContentLoaded', function() {
              alert('日期格式不正确，需为YYYY-MM-DD，可选负号表示公元前');
              return;
          }
-         const notes = document.getElementById('notes').value;
+         const title = (document.getElementById('title').value || '').trim();
+         const body = (document.getElementById('body').value || '').trim();
+         if (!title) {
+             alert('请填写标题（必填，≤50字）');
+             return;
+         }
+         const finalTitle = title.slice(0,50);
          const selectedTags = getSelectedTags(); // 这已经是字符串了
          const color = document.getElementById('modalPinColor').value;
          const style = document.getElementById('modalPinStyle').value;
@@ -470,8 +539,9 @@ document.addEventListener('DOMContentLoaded', function() {
          // 构建图钉数据
          const pinData = {
              date: date,
-             category: selectedTags, // selectedTags已经是字符串，不需要join
-             notes: notes || '',
+             category: selectedTags, // 字符串，无需 join
+             title: finalTitle,
+             body: body || '',
              lat: lat,
              lng: lng,
              color: color,
@@ -616,6 +686,39 @@ function updateToolButtons() {
         mapElement.classList.remove('pin-mode');
         mapElement.classList.add('select-mode');
     }
+}
+
+// —— Popup 内容构建与交互 ——
+function humanDate(dateStr) {
+    if (!dateStr) return '';
+    const m = dateStr.match(/^(-)?(\d{1,4})-(\d{2})-(\d{2})$/);
+    if (!m) return dateStr;
+    const sign = m[1] ? -1 : 1;
+    const year = parseInt(m[2], 10) * sign;
+    const rest = `${m[3]}-${m[4]}`;
+    return year < 0 ? `公元前${String(Math.abs(year)).padStart(4,'0')}-${rest}` : `${String(year).padStart(4,'0')}-${rest}`;
+}
+
+function buildPopupContent({ date, category, title }, markerId) {
+    const tags = (category || '').split(',').map(t => t.trim()).filter(Boolean);
+    const tagsHtml = tags.map(t => `<span class="tag-badge">${t}</span>`).join(' ');
+    const escapedTitle = (title || '未命名').slice(0,50);
+    return `
+        <div class="popup-content" data-marker-id="${markerId}">
+            <div class="popup-header">
+                <div class="popup-time">${humanDate(date)}</div>
+                <div class="popup-tags">${tagsHtml}</div>
+                <div class="popup-title" style="font-weight:600; margin-top:6px;">${escapedTitle}</div>
+            </div>
+            <div class="popup-actions">
+                <button class="btn-expand" data-action="expand" aria-label="展开详情">▶ 展开详情</button>
+                <button class="btn-collapse" data-action="collapse" style="display:none" aria-label="收起详情">▲ 收起</button>
+                <button onclick="editPin('${markerId}')">编辑</button>
+                <button onclick="deletePin('${markerId}')">删除</button>
+            </div>
+            <div class="popup-details" data-loaded="false"></div>
+        </div>
+    `;
 }
 
 // 激活图钉坐标悬浮提示
@@ -1163,7 +1266,8 @@ function parseMarkdownContent(content, filename) {
     const lines = content.split('\n');
     
     let currentPin = null;
-    let inNotesSection = false;
+    let inTitleSection = false;
+    let inBodySection = false;
     
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
@@ -1173,13 +1277,15 @@ function parseMarkdownContent(content, filename) {
             currentPin = {
                 date: null,
                 category: '',
-                notes: '',
+                title: '',
+                body: '',
                 lat: 39.9042, // 默认北京坐标
                 lng: 116.4074,
                 color: 'auto',
                 style: 'circle'
             };
-            inNotesSection = false;
+            inTitleSection = false;
+            inBodySection = false;
             continue;
         }
         
@@ -1229,21 +1335,24 @@ function parseMarkdownContent(content, filename) {
             continue;
         }
         
-        // 检测笔记部分开始
-        if (line === '## 笔记') {
-            inNotesSection = true;
-            continue;
-        }
+        // 新字段：标题与正文
+        if (line === '## 标题') { inTitleSection = true; inBodySection = false; continue; }
+        if (line === '## 正文') { inBodySection = true; inTitleSection = false; continue; }
+        // 兼容旧字段：## 笔记 当作正文
+        if (line === '## 笔记') { inBodySection = true; inTitleSection = false; continue; }
         
-        // 收集笔记内容
-        if (inNotesSection && line && line !== '无') {
-            currentPin.notes += line + '\n';
+        if (inTitleSection && line) {
+            currentPin.title += line + ' ';
+        }
+        if (inBodySection && line && line !== '无') {
+            currentPin.body += line + '\n';
         }
     }
     
     // 添加图钉（如果有有效数据）
     if (currentPin && currentPin.date !== null) {
-        currentPin.notes = currentPin.notes.trim();
+        currentPin.title = (currentPin.title || '').trim().slice(0,50) || deriveTitle(currentPin.body || '');
+        currentPin.body = (currentPin.body || '').trim();
         pins.push(currentPin);
     }
     
@@ -1308,6 +1417,29 @@ function normalizePinDate(pinData) {
         pinData.date = `${yStr}-01-01`;
         delete pinData.year;
     }
+}
+
+function normalizePinFields(pinData) {
+    if (!pinData) return;
+    // 如果已有title/body，规范长度
+    if (pinData.title || pinData.body) {
+        pinData.title = (pinData.title || '').slice(0,50) || deriveTitle(pinData.body || '');
+        pinData.body = pinData.body || '';
+        return;
+    }
+    // 兼容旧notes字段
+    const notes = pinData.notes || '';
+    pinData.title = deriveTitle(notes);
+    pinData.body = notes;
+    delete pinData.notes;
+}
+
+function deriveTitle(text) {
+    const t = (text || '').replace(/\r/g,'').split('\n').find(l => l.trim()) || '';
+    // 优先使用首个Markdown标题行
+    const h = t.match(/^\s{0,3}#{1,6}\s+(.*)$/);
+    const raw = h ? h[1].trim() : t.trim();
+    return raw.slice(0,50) || '未命名';
 }
 
 console.log('App loaded successfully');

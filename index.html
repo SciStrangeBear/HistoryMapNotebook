@@ -108,28 +108,49 @@
             <span class="close">&times;</span>
             <h2>添加历史标记</h2>
             <form id="pinForm">
-                <div class="form-group">
-                    <label for="date">日期 (必填):</label>
-                    <input type="text" id="date" required placeholder="例如: 1949-10-01 或 -0300-01-01" pattern="^-?\d{1,4}-\d{2}-\d{2}$" title="格式为 YYYY-MM-DD，可选负号表示公元前">
-                </div>
-                <div class="form-group">
-                    <label for="category">标签 (可多选):</label>
-                    <div class="tag-selector">
-                        <div id="availableTags" class="available-tags">
-                            <!-- 可选标签将在这里动态加载 -->
-                        </div>
-                        <div id="selectedTags" class="selected-tags">
-                            <div class="selected-tags-label">已选标签:</div>
-                            <div id="selectedTagsList" class="selected-tags-list">
-                                <!-- 已选标签将在这里显示 -->
+                <!-- 基础信息区：日期与标签 -->
+                <fieldset class="form-section">
+                    <legend>基础信息</legend>
+                    <div class="form-group">
+                        <label for="date">日期 (必填):</label>
+                        <input type="text" id="date" required placeholder="例如: 1949-10-01 或 -0300-01-01" pattern="^-?\d{1,4}-\d{2}-\d{2}$" title="格式为 YYYY-MM-DD，可选负号表示公元前">
+                    </div>
+                    <div class="form-group">
+                        <label for="category">标签 (可多选):</label>
+                        <div class="tag-selector">
+                            <div id="availableTags" class="available-tags">
+                                <!-- 可选标签将在这里动态加载 -->
+                            </div>
+                            <div id="selectedTags" class="selected-tags">
+                                <div class="selected-tags-label">已选标签:</div>
+                                <div id="selectedTagsList" class="selected-tags-list">
+                                    <!-- 已选标签将在这里显示 -->
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-                <div class="form-group">
-                    <label for="notes">笔记:</label>
-                    <textarea id="notes" rows="5" placeholder="记录详细信息..."></textarea>
-                </div>
+                </fieldset>
+
+                <!-- 标题输入区 -->
+                <fieldset class="form-section">
+                    <legend>标题</legend>
+                    <div class="form-group">
+                        <label for="title">标题 (必填，≤50字):</label>
+                        <div class="title-input-wrap">
+                            <input type="text" id="title" maxlength="50" required placeholder="请输入标题">
+                            <span id="titleCounter" class="char-counter">0 / 50</span>
+                        </div>
+                    </div>
+                </fieldset>
+
+                <!-- 正文编辑区（Markdown） -->
+                <fieldset class="form-section">
+                    <legend>正文（Markdown 可选）</legend>
+                    <div class="form-group">
+                        <label for="body">正文:</label>
+                        <textarea id="body" rows="7" placeholder="支持 Markdown 格式（可选）"></textarea>
+                    </div>
+                </fieldset>
                 <div class="form-group">
                     <label>图钉样式:</label>
                     <div class="pin-style-controls">
